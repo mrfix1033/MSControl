@@ -87,9 +87,6 @@ class Client:
     def start_handle_input(self):
         commands_map = {
             "startup": StartupCommand(),
-            "check_update": CheckUpdate(self.updater.check_update),
-            "update": UpdateCommand(self.update),
-            "restart": RestartCommand(self.restart),
             "stop": StopCommand(self.stop),
             "version": Version(self.version),
         }

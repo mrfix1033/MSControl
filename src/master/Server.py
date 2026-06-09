@@ -120,6 +120,8 @@ class Server:
                         self.server_udp.sendto(serialize_packet(IAmServerPacket()),
                                             ("255.255.255.255", self.config.beacon_port))
                         await asyncio.sleep(self.config.beacon_interval)
+            except Exception as e:
+                print(e)
             finally:
                 Logger.log("Маячковый сервер остановлен")
 
