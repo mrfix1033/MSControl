@@ -1,3 +1,4 @@
+opencv-python
 requests
 pywin32
 pynput
@@ -6,3 +7,4 @@ colorama
 pyyaml
 pycaw
 pyinstaller
+mss

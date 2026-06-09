@@ -6,7 +6,7 @@ from src.core.protocol.FromServer import FindPacket
 from src.core.utils import StartupUtils, StringUtils
 from src.core.utils.CommandsUtils import *
 from src.core.utils.StringUtils import is_correct_ip
-from src.server.ServerUtils import UpdateAllClientsData
+from src.master.ServerUtils import UpdateAllClientsData
 
 
 class ShutdownCommand(BaseCommand, ABC):
@@ -24,7 +24,7 @@ class ShutdownCommand(BaseCommand, ABC):
             self.all_func()
         elif args[0] == "all_clients":
             self.all_clients_func()
-        elif args[0] == "server":
+        elif args[0] == "master":
             self.server_func()
         else:
             if not is_correct_ip(args[0]):
@@ -35,12 +35,12 @@ class ShutdownCommand(BaseCommand, ABC):
 
 class RestartCommand(ShutdownCommand):
     def get_usage(self) -> str:
-        return "restart <IP>/server/all_clients/all - перезапустить программу на: определённом компьютере/сервере(здесь)/всех клиентах/везде (потеряете 20МБ ОЗУ, также можно перезагрузить пк)"
+        return "restart <IP>/master/all_clients/all - перезапустить программу на: определённом компьютере/сервере(здесь)/всех клиентах/везде (потеряете 20МБ ОЗУ, также можно перезагрузить пк)"
 
 
 class StopCommand(ShutdownCommand):
     def get_usage(self) -> str:
-        return "stop <IP>/server/all_clients/all - остановить программу на: определённом компьютере/сервере(здесь)/всех клиентах/везде"
+        return "stop <IP>/master/all_clients/all - остановить программу на: определённом компьютере/сервере(здесь)/всех клиентах/везде"
 
 
 class ClientsConsole(BaseCommand):
@@ -102,14 +102,14 @@ class StartupCommand(BaseCommand):
         self.func_for_client = func_for_client
 
     def get_usage(self) -> str:
-        return "startup add/remove clients/server - добавить/убрать клиентам/серверу программу из автозагрузки"
+        return "startup add/remove clients/master - добавить/убрать клиентам/серверу программу из автозагрузки"
 
     def execute(self, args: list[str]):
         if len(args) != 2:
             not_enough_arguments(self.get_usage())
             return
         action, whom = args
-        if whom == "server":
+        if whom == "master":
             if action == "add":
                 StartupUtils.add_to_startup("Server")
                 Logger.log(f"Программа добавлена в автозагрузку")

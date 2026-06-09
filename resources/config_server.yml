@@ -4,3 +4,4 @@ beacon_port: 10331
 beacon_interval: 3
 auto_enable_startup: false
 find_sound_volume: 0.4
+packet_size: 1024

@@ -8,13 +8,18 @@ import threading
 import time
 import traceback
 
+import cv2
+import mss
+import numpy as np
 import win32api
 import win32con
 import win32gui
 
 import src.core.utils.CommandsListener
-from src.client.FindingUtils import FindingManager
-from src.client.commands import *
+from src.core.protocol.Screen import ScreenPacket
+from src.core.utils.Scheduler import Scheduler
+from src.slave.FindingUtils import FindingManager
+from src.slave.commands import *
 from src.core import CoreConstants, Configuration
 from src.core.CoreCommands import *
 from src.core.Exceptions import LastReleaseAlreadyInstalled
@@ -28,12 +33,12 @@ from src.core.protocol.Mouse import *
 from src.core.utils.PacketUtils import PacketBuilder
 
 
-class ActionMulticastClient:
+class Client:
     def __init__(self):
         self.version = CoreConstants.version
-        self.updater = Updater(self.version, True)
         self.packet_builder = PacketBuilder()
         self.loop = asyncio.new_event_loop()
+        self.scheduler = Scheduler()
         self.running = True
 
         self.threads = []
@@ -109,17 +114,6 @@ class ActionMulticastClient:
         self.stop_logic()
         Logger.log("Ожидание завершения работы...")
 
-    def restart(self):
-        Logger.log("Перезапуск...")
-        self.stop_logic()
-        Logger.log("Ожидание завершения работы...")
-        python = sys.executable
-        Logger.log("Запуск нового процесса...")
-        subprocess.Popen([python] + sys.argv)
-        Logger.log("Новый процесс запущен")
-        while True:  # чтобы не завершать текущий процесс (избежать ошибки)
-            time.sleep(999999)
-
     async def start_client(self):
         while self.running:
             server_ip_port = self.config.server_ip, self.config.server_port
@@ -170,6 +164,7 @@ class ActionMulticastClient:
         return None
 
     def start_listen_server(self):
+        self.start_send_screen()
         while self.running:
             try:
                 data = self.client.recv(1024)
@@ -188,6 +183,18 @@ class ActionMulticastClient:
                     self.handle_command(packet_name, buffer)
                 else:
                     break
+
+    def start_send_screen(self):
+        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+        sct = mss.MSS()
+        monitor = sct.monitors[1]
+        def send_screen():
+            screenshot = sct.grab(monitor)
+            img = np.array(screenshot)
+            frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            result, encoded_img = cv2.imencode('.jpg', frame, JPEG_QUALITY)
+            self.send_to_server(ScreenPacket(encoded_img.tobytes()))
+        self.scheduler.schedule(send_screen, 0, 1000/3)
 
     def handle_command(self, packet_name, packet_data):
         if packet_name == KeyboardPressPacket.get_id():
@@ -315,7 +322,7 @@ if __name__ == "__main__":
     is_main_loop_running = True
     while is_main_loop_running:
         try:
-            client = ActionMulticastClient()
+            client = Client()
             client.main()
             client.join()
         except KeyboardInterrupt:

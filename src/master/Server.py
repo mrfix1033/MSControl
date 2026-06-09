@@ -1,4 +1,8 @@
 import asyncio
+
+import cv2
+import numpy as np
+import screeninfo
 import socket
 import subprocess
 import sys
@@ -6,32 +10,31 @@ import threading
 import time
 import traceback
 
-import screeninfo
-
 import src.core.utils.CommandsListener
 from src.core import CoreConstants, Configuration
 from src.core.CoreCommands import *
 from src.core.Exceptions import LastReleaseAlreadyInstalled
 from src.core.Network import serialize_packet
-from src.core.Updater import Updater
+from src.core.protocol import Screen
 from src.core.protocol.FromClient import UpdateClientResultPacket
-from src.core.protocol.FromServer import ClientsConsoleVisiblePacket, UpdateClientPacket, StartupPacket, \
+from src.core.protocol.FromServer import ClientsConsoleVisiblePacket, \
+    UpdateClientPacket, StartupPacket, \
     IAmServerPacket
 from src.core.protocol.Keyboard import *
 from src.core.protocol.Mouse import *
+from src.core.protocol.Screen import ScreenPacket
 from src.core.utils.PacketUtils import PacketBuilder
-from src.server.commands import *
+from src.master.commands import *
 
 
-class ActionMulticastServer:
+class Server:
     def __init__(self):
         self.version = CoreConstants.version
-        self.updater = Updater(self.version, False)
         self.commands_buffer = PacketBuilder()
         self.running = True
 
         self.threads = []
-        self.clients: dict[str, socket.socket] = {}
+        self.clients: dict[str, ClientObject] = {}
         self.server = None
         self.server_udp = None
         self.update_all_clients_data = None
@@ -107,17 +110,6 @@ class ActionMulticastServer:
         self.stop_logic()
         Logger.log("Ожидание завершения работы...")
 
-    def restart(self):
-        Logger.log("Перезапуск...")
-        self.stop_logic()
-        Logger.log("Ожидание завершения работы...")
-        python = sys.executable
-        Logger.log("Запуск нового процесса...")
-        subprocess.Popen([python] + sys.argv)
-        Logger.log("Новый процесс запущен")
-        while True:  # чтобы не завершать текущий процесс (избежать ошибки)
-            time.sleep(999999)
-
     async def start_server_broadcasting(self):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.server_udp:
@@ -160,7 +152,7 @@ class ActionMulticastServer:
         packet_builder = PacketBuilder()
         while self.running:
             try:
-                data = client_socket.recv(1024)
+                data = client_socket.recv(self.config.packet_size)
             except ConnectionError:
                 self.clients.pop(ip_port[0])
                 Logger.log(f"{len(self.clients)}) Соединение потеряно {ip_port}")
@@ -186,6 +178,16 @@ class ActionMulticastServer:
         if packet_name == UpdateClientResultPacket.get_id():
             packet = UpdateClientResultPacket.deserialize(packet_data)
             self.update_all_clients_data.handle(ip_port[0], packet.is_successful)
+        elif packet_name == ScreenPacket.get_id():
+            packet = ScreenPacket.deserialize(packet_data)
+
+            data = packet.encoded_img
+
+            np_arr = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+            if frame is not None:
+                cv2.imshow("Трансляция Экрана", cv2.resize(frame, (960, 540)))
 
     def send_to_all_clients(self, packet: BasePacket):
         packet_data = serialize_packet(packet)
@@ -264,13 +266,18 @@ class ActionMulticastServer:
         return True
 
 
+class ClientObject:
+    def __init__(self, name, socket):
+        self.name = name
+        self.socket = socket
+
 if __name__ == "__main__":
     CoreConstants.init()
     Logger.log(CoreConstants.greeting("Server"))
     is_main_loop_running = True
     while is_main_loop_running:
         try:
-            server = ActionMulticastServer()
+            server = Server()
             server.main()
             server.join()
         except KeyboardInterrupt:

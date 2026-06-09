@@ -58,7 +58,7 @@ server_port
 `start_hidden: false`\
 Скрывать консоль при запуске?
 
-`auto_enable_startup: false`
+`auto_enable_startup: false`\
 Добавлять программу при запуске в автозагрузку?
 
 ## Конфиг сервера

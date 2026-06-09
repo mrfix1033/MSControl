@@ -46,7 +46,7 @@ class Updater:
             self.check_update()
             if self.release is None:
                 raise LastReleaseAlreadyInstalled()
-        client_or_server = "client" if self.is_client else "server"
+        client_or_server = "slave" if self.is_client else "master"
         platform_to_extension = {"win32": ".exe"}
         need_asset = f"ActionMulticast-{client_or_server}-{sys.platform}{platform_to_extension[sys.platform]}"
         Logger.log(f"Требуемый файл: {need_asset}")
