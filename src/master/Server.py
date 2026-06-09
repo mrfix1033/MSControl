@@ -188,7 +188,7 @@ class Server:
             self.update_all_clients_data.handle(ip_port[0], packet.is_successful)
         elif packet_name == ScreenPacket.get_id():
             packet = ScreenPacket.deserialize(packet_data)
-            data = packet.encoded_img
+            data = packet.encoded_audio
             np_arr = np.frombuffer(data, np.uint8)
             frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             if frame is not None:

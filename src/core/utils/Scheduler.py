@@ -18,11 +18,11 @@ class Scheduler:
             if current_time >= task[1]:
                 try:
                     task[0]()
-                    if task[2] > 0:
-                        task[1] = time.time()+task[2]
-                        remaining_tasks.append(task)
-                except Exception:
+                except:
                     traceback.print_exc()
+                if task[2] > 0:
+                    task[1] = time.time()+task[2]
+                    remaining_tasks.append(task)
             else:
                 remaining_tasks.append(task)
 
