@@ -9,3 +9,4 @@ pycaw
 pyinstaller
 mss
 pyqt5
+pyaudio

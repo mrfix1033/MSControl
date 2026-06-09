@@ -4,5 +4,6 @@ beacon_port: 10331
 keycodes_to_hide_show_console: [165, 163, 161, 13]
 start_hidden: false
 auto_enable_startup: false
-screen_quality: 10
-scheduler_tick_interval: 0.1  # in seconds
+screen_quality: 20  # 0-100
+scheduler_tick_interval: 0.1 # in seconds
+screen_fps: 180  # scheduler_tick_interval must be less than 1 / screen_fps

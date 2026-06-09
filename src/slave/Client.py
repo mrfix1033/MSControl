@@ -1,8 +1,8 @@
 import asyncio
+import ctypes
 import os.path
 import shutil
 import socket
-import subprocess
 import sys
 import threading
 import time
@@ -16,21 +16,19 @@ import win32con
 import win32gui
 
 import src.core.utils.CommandsListener
-from src.core.protocol.Screen import ScreenPacket
-from src.core.utils.Scheduler import Scheduler
-from src.slave.FindingUtils import FindingManager
-from src.slave.commands import *
 from src.core import CoreConstants, Configuration
 from src.core.CoreCommands import *
 from src.core.Exceptions import LastReleaseAlreadyInstalled
-from src.core.Loging import Logger
 from src.core.Network import serialize_packet
-from src.core.Updater import Updater
 from src.core.protocol.FromClient import UpdateClientResultPacket
 from src.core.protocol.FromServer import *
 from src.core.protocol.Keyboard import *
 from src.core.protocol.Mouse import *
+from src.core.protocol.Screen import ScreenPacket
 from src.core.utils.PacketUtils import PacketBuilder
+from src.core.utils.Scheduler import Scheduler
+from src.slave.FindingUtils import FindingManager
+from src.slave.commands import *
 
 
 class Client:
@@ -43,7 +41,7 @@ class Client:
 
         self.threads = []
         self.udp_client = None
-        self.client = None
+        self.client: socket.socket | None = None
 
         self.config = Configuration.YamlConfig("config_client.yml")
 
@@ -68,18 +66,19 @@ class Client:
 
         self.keyboard_listeners = self.run_keyboard_listeners()
 
-        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), self.config.screen_quality]
+        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY),
+                        self.config.screen_quality]
         sct = mss.MSS()
         monitor = sct.monitors[1]
+
         def send_screen():
-            if self.client is None:
-                return
             screenshot = sct.grab(monitor)
             img = np.array(screenshot)
             frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
             result, encoded_img = cv2.imencode('.jpg', frame, JPEG_QUALITY)
             self.send_to_server(ScreenPacket(encoded_img.tobytes()))
-        self.scheduler.schedule(send_screen, 0, 1/3)
+
+        self.scheduler.schedule(send_screen, 0, 1 / self.config.screen_fps)
 
         self.loop.run_until_complete(self._async_start())  # blocking
 
@@ -110,7 +109,8 @@ class Client:
             "version": Version(self.version),
         }
         commands_map["help"] = HelpCommand(list(commands_map.values()))
-        src.core.utils.CommandsListener.start_listen_commands(commands_map, lambda: self.running)
+        src.core.utils.CommandsListener.start_listen_commands(commands_map,
+                                                              lambda: self.running)
         Logger.log("Обработка команд прекращена")
 
     def stop_logic(self):
@@ -138,9 +138,11 @@ class Client:
                 server_ip_port = self.find_server()
             if server_ip_port is None:
                 continue
-            Logger.log(f"Подключение к {server_ip_port[0]}:{server_ip_port[1]}")
+            Logger.log(
+                f"Подключение к {server_ip_port[0]}:{server_ip_port[1]}")
             try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.client:
+                with socket.socket(socket.AF_INET,
+                                   socket.SOCK_STREAM) as self.client:
                     try:
                         self.client.connect(server_ip_port)
                     except InterruptedError:
@@ -148,7 +150,8 @@ class Client:
                     Logger.log("Подключено")
                     self.start_listen_server()
             except ConnectionRefusedError:
-                Logger.log("Соединение отклонено, повторное подключение через 5 секунд")
+                Logger.log(
+                    "Соединение отклонено, повторное подключение через 5 секунд")
                 time.sleep(5)
             except:
                 Logger.error(traceback.format_exc())
@@ -156,9 +159,12 @@ class Client:
                 Logger.log("Соединение закрыто")
 
     def find_server(self) -> typing.Optional[str]:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_client:
-            self.udp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.udp_client.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        with socket.socket(socket.AF_INET,
+                           socket.SOCK_DGRAM) as self.udp_client:
+            self.udp_client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
+                                       1)
+            self.udp_client.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,
+                                       1)
             self.udp_client.bind(('0.0.0.0', self.config.beacon_port))
 
             packet_builder_udp = PacketBuilder()
@@ -207,16 +213,18 @@ class Client:
             packet = KeyboardReleasePacket.deserialize(packet_data)
             win32api.keybd_event(packet.c, 0, win32con.KEYEVENTF_KEYUP, 0)
         elif packet_name == MouseMovementAbsolutePercentagePacket.get_id():
-            packet = MouseMovementAbsolutePercentagePacket.deserialize(packet_data)
-            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE,
-                                 int(packet.x * 65535), int(packet.y * 65535))
+            packet = MouseMovementAbsolutePercentagePacket.deserialize(
+                packet_data)
+            win32api.mouse_event(
+                win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE,
+                int(packet.x * 65535), int(packet.y * 65535))
         elif packet_name == MousePressPacket.get_id():
             packet = MousePressPacket.deserialize(packet_data)
             if packet.b == 1:
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
+            # elif packet.b == 2:
+            #     win32api.mouse_event(win32con.MOUSEEVENTF_MIDDLEDOWN, 0, 0)
             elif packet.b == 2:
-                win32api.mouse_event(win32con.MOUSEEVENTF_MIDDLEDOWN, 0, 0)
-            elif packet.b == 3:
                 win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0)
             else:
                 Logger.log("unknown mouse button pressed")
@@ -224,9 +232,9 @@ class Client:
             packet = MouseReleasePacket.deserialize(packet_data)
             if packet.b == 1:
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
+            # elif packet.b == 2:
+            #     win32api.mouse_event(win32con.MOUSEEVENTF_MIDDLEUP, 0, 0)
             elif packet.b == 2:
-                win32api.mouse_event(win32con.MOUSEEVENTF_MIDDLEUP, 0, 0)
-            elif packet.b == 3:
                 win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0)
             else:
                 Logger.log("unknown mouse button pressed")
@@ -238,12 +246,18 @@ class Client:
                 self.hide_console()
         elif packet_name == MouseScrollPacket.get_id():
             packet = MouseScrollPacket.deserialize(packet_data)
-            win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, packet.dx, packet.dy)
+            if packet.dy:
+                win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0,
+                                     packet.dy, 0)
+            if packet.dx:
+                win32api.mouse_event(win32con.MOUSEEVENTF_HWHEEL, 0, 0,
+                                     packet.dx, 0)
         elif packet_name == UpdateClientPacket.get_id():
             Logger.log("Обновление с сервера...")
             successful = False
             try:
-                temp_file_path = os.path.join(os.getenv("TEMP"), f"{CoreConstants.program_name}-update-from-server.exe")
+                temp_file_path = os.path.join(os.getenv("TEMP"),
+                                              f"{CoreConstants.program_name}-update-from-server.exe")
                 with open(temp_file_path, 'wb') as file:
                     file.write(packet_data)
                 path_for_old = sys.executable + ".old"
@@ -254,15 +268,18 @@ class Client:
                 successful = True
             finally:
                 self.send_to_server(UpdateClientResultPacket(successful))
-            Logger.log("Обновление установлено. Оно будет применено после перезапуска")
+            Logger.log(
+                "Обновление установлено. Оно будет применено после перезапуска")
         elif packet_name == StartupPacket.get_id():
             packet = StartupPacket.deserialize(packet_data)
             if packet.is_add:
-                Logger.log("По инициативе сервера, программа добавляется в автозагрузку...")
+                Logger.log(
+                    "По инициативе сервера, программа добавляется в автозагрузку...")
                 StartupUtils.add_to_startup("Client")
                 Logger.log("Программа добавлена в автозагрузку")
             else:
-                Logger.log("По инициативе сервера, программа удаляется из автозагрузки...")
+                Logger.log(
+                    "По инициативе сервера, программа удаляется из автозагрузки...")
                 StartupUtils.remove_from_startup("Client")
                 Logger.log("Программа удалена из автозагрузки")
         elif packet_name == FindPacket.get_id():
@@ -274,12 +291,21 @@ class Client:
             elif packet.find_type == "all":
                 self.finding_manager.all(packet.volume)
             else:
-                Logger.log(f"Неизвестные данные пакеты для пакета FindPacket: {packet_data}")
+                Logger.log(
+                    f"Неизвестные данные пакеты для пакета FindPacket: {packet_data}")
         else:
-            Logger.log(f"Неизвестный пакет {packet_name} с данными {packet_data}")
+            Logger.log(
+                f"Неизвестный пакет {packet_name} с данными {packet_data}")
 
     def send_to_server(self, packet: BasePacket):
-        self.client.send(serialize_packet(packet))
+        if self.client is None:
+            return
+        try:
+            self.client.send(serialize_packet(packet))
+        except OSError:
+            pass
+        except:
+            traceback.print_exc()
 
     def run_keyboard_listeners(self):
         from pynput import keyboard
@@ -301,8 +327,11 @@ class Client:
         def any_action_func(key):
             self.finding_manager.flag = False
 
-        hotkey = keyboard.HotKey(self.config.keycodes_to_hide_show_console, on_activate)
-        hotkey_listener = keyboard.Listener(on_press=get_func(hotkey.press), on_release=get_func(hotkey.release))
+        hotkey = keyboard.HotKey(self.config.keycodes_to_hide_show_console,
+                                 on_activate)
+        hotkey_listener = keyboard.Listener(on_press=get_func(hotkey.press),
+                                            on_release=get_func(
+                                                hotkey.release))
         hotkey_listener.start()
         any_action_listener = keyboard.Listener(on_press=any_action_func)
         any_action_listener.start()
@@ -320,6 +349,10 @@ class Client:
 
 
 if __name__ == "__main__":
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        print("please start from admin, otherwise may be problems")
+        time.sleep(3)
+        exit(1)
     CoreConstants.init()
     Logger.log(CoreConstants.greeting("Client"))
     is_main_loop_running = True
