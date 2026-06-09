@@ -1,21 +1,18 @@
 import asyncio
+import socket
+import threading
+import time
+import traceback
 
 import cv2
 import numpy as np
 import screeninfo
-import socket
-import subprocess
-import sys
-import threading
-import time
-import traceback
 
 import src.core.utils.CommandsListener
 from src.core import CoreConstants, Configuration
 from src.core.CoreCommands import *
 from src.core.Exceptions import LastReleaseAlreadyInstalled
 from src.core.Network import serialize_packet
-from src.core.protocol import Screen
 from src.core.protocol.FromClient import UpdateClientResultPacket
 from src.core.protocol.FromServer import ClientsConsoleVisiblePacket, \
     UpdateClientPacket, StartupPacket, \
@@ -43,6 +40,8 @@ class Server:
 
         self.keyboard_listener = None
         self.mouse_listener = None
+
+        self.gui =
 
     def main(self):
         if self.config.auto_enable_startup:
@@ -182,14 +181,11 @@ class Server:
             self.update_all_clients_data.handle(ip_port[0], packet.is_successful)
         elif packet_name == ScreenPacket.get_id():
             packet = ScreenPacket.deserialize(packet_data)
-
             data = packet.encoded_img
-
             np_arr = np.frombuffer(data, np.uint8)
             frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
             if frame is not None:
-                cv2.imshow("Трансляция Экрана", cv2.resize(frame, (960, 540)))
+                self.gui.show_img(frame)
 
     def send_to_all_clients(self, packet: BasePacket):
         packet_data = serialize_packet(packet)
