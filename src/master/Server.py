@@ -79,7 +79,6 @@ class Server:
             "update_all_clients_info": UpdateAllClientsInfo(lambda: self.update_all_clients_data),
             "count": Count(lambda: len(self.clients)),
             "find": Find(self.find_func),
-            "restart": RestartCommand(None, self.restart, None, None),
             "stop": StopCommand(None, self.stop, None, None),
             "version": Version(self.version),
         }
@@ -111,17 +110,18 @@ class Server:
         Logger.log("Ожидание завершения работы...")
 
     async def start_server_broadcasting(self):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.server_udp:
-                self.server_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                self.server_udp.bind((self.config.ip, self.config.port))
-                Logger.log("Маячковый сервер запущен")
-                while self.running:
-                    self.server_udp.sendto(serialize_packet(IAmServerPacket()),
-                                           ("255.255.255.255", self.config.beacon_port))
-                    await asyncio.sleep(self.config.beacon_interval)
-        finally:
-            Logger.log("Маячковый сервер остановлен")
+        while self.running:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.server_udp:
+                    self.server_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                    self.server_udp.bind((self.config.ip, self.config.port))
+                    Logger.log("Маячковый сервер запущен")
+                    while self.running:
+                        self.server_udp.sendto(serialize_packet(IAmServerPacket()),
+                                            ("255.255.255.255", self.config.beacon_port))
+                        await asyncio.sleep(self.config.beacon_interval)
+            finally:
+                Logger.log("Маячковый сервер остановлен")
 
     async def start_server(self):
         try:
