@@ -7,7 +7,7 @@ class Scheduler:
         self.tasks = []
 
     def schedule(self, func, delay1, delay_next=-1):
-        # delays in ms
+        # delays in s
         self.tasks.append([func, time.time() + delay1, delay_next])
 
     def tick(self):

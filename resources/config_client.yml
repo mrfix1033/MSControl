@@ -4,3 +4,4 @@ beacon_port: 10331
 keycodes_to_hide_show_console: [165, 163, 161, 13]
 start_hidden: false
 auto_enable_startup: false
+scheduler_tick_interval: 0.1  # in seconds

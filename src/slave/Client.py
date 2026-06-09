@@ -60,14 +60,33 @@ class Client:
             StartupUtils.add_to_startup("Client")
 
         self.threads = [
-            threading.Thread(target=self.start_handle_input)
+            threading.Thread(target=self.start_handle_input),
+            threading.Thread(target=self.start_scheduler),
         ]
         for thread in self.threads:
             thread.start()
 
         self.keyboard_listeners = self.run_keyboard_listeners()
 
+        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+        sct = mss.MSS()
+        monitor = sct.monitors[1]
+        def send_screen():
+            if self.client is None:
+                return
+            screenshot = sct.grab(monitor)
+            img = np.array(screenshot)
+            frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+            result, encoded_img = cv2.imencode('.jpg', frame, JPEG_QUALITY)
+            self.send_to_server(ScreenPacket(encoded_img.tobytes()))
+        self.scheduler.schedule(send_screen, 0, 1/3)
+
         self.loop.run_until_complete(self._async_start())  # blocking
+
+    def start_scheduler(self):
+        while self.running:
+            self.scheduler.tick()
+            time.sleep(self.config.scheduler_tick_interval)
 
     async def _async_start(self):
         await self.start_client()
@@ -161,7 +180,6 @@ class Client:
         return None
 
     def start_listen_server(self):
-        self.start_send_screen()
         while self.running:
             try:
                 data = self.client.recv(1024)
@@ -180,19 +198,6 @@ class Client:
                     self.handle_command(packet_name, buffer)
                 else:
                     break
-            self.scheduler.tick()
-
-    def start_send_screen(self):
-        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
-        sct = mss.MSS()
-        monitor = sct.monitors[1]
-        def send_screen():
-            screenshot = sct.grab(monitor)
-            img = np.array(screenshot)
-            frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-            result, encoded_img = cv2.imencode('.jpg', frame, JPEG_QUALITY)
-            self.send_to_server(ScreenPacket(encoded_img.tobytes()))
-        self.scheduler.schedule(send_screen, 0, 1000/3)
 
     def handle_command(self, packet_name, packet_data):
         if packet_name == KeyboardPressPacket.get_id():
