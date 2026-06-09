@@ -15,10 +15,11 @@ from src.core.protocol.Mouse import MouseMovementAbsolutePercentagePacket, \
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, send_to_all_clients_func, stop_running):
+    def __init__(self, send_to_all_clients_func, stop_running, config):
         super().__init__()
         self.send_to_all_clients = send_to_all_clients_func
         self.stop_running = stop_running
+        self.config = config
         self.init_ui()
         self.setMouseTracking(True)
         self.centralWidget().setMouseTracking(True)
@@ -89,13 +90,17 @@ class MainWindow(QMainWindow):
         self.send_to_all_clients(MouseReleasePacket(event.button()))
 
     def keyPressEvent(self, event):
-        self.send_to_all_clients(KeyboardPressPacket(event.nativeScanCode()))
+        if event.nativeVirtualKey() in self.config.forbidden_keys:
+            return
+        self.send_to_all_clients(KeyboardPressPacket(event.nativeVirtualKey()))
 
     def keyReleaseEvent(self, event):
-        self.send_to_all_clients(KeyboardReleasePacket(event.nativeScanCode()))
+        if event.nativeVirtualKey() in self.config.forbidden_keys:
+            return
+        self.send_to_all_clients(KeyboardReleasePacket(event.nativeVirtualKey()))
 
     def wheelEvent(self, event):
-        self.send_to_all_clients(MouseScrollPacket(event.angleDelta().x(), event.angleDelta().y()))
+        self.send_to_all_clients(MouseScrollPacket(-event.angleDelta().x(), event.angleDelta().y()))
 
     def closeEvent(self, event):
         self.stop_running()

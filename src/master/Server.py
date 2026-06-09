@@ -48,7 +48,7 @@ class Server:
 
         def stop_running():
             self.running = False
-        self.gui = MainWindow(self.send_to_all_clients, stop_running)
+        self.gui = MainWindow(self.send_to_all_clients, stop_running, self.config)
 
     def init(self):
         if self.config.auto_enable_startup:
