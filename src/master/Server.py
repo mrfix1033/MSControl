@@ -1,12 +1,18 @@
+import sys
+import threading
+
+sys.excepthook = lambda *a: traceback.print_last()
+threading.excepthook = sys.excepthook
+
 import asyncio
 import socket
-import threading
 import time
 import traceback
 
 import cv2
 import numpy as np
 import screeninfo
+from PyQt5.QtWidgets import QApplication
 
 import src.core.utils.CommandsListener
 from src.core import CoreConstants, Configuration
@@ -17,7 +23,6 @@ from src.core.protocol.FromClient import UpdateClientResultPacket
 from src.core.protocol.FromServer import ClientsConsoleVisiblePacket, \
     UpdateClientPacket, StartupPacket, \
     IAmServerPacket
-from src.core.protocol.Keyboard import *
 from src.core.protocol.Mouse import *
 from src.core.protocol.Screen import ScreenPacket
 from src.core.utils.PacketUtils import PacketBuilder
@@ -32,7 +37,7 @@ class Server:
         self.running = True
 
         self.threads = []
-        self.clients: dict[str, ClientObject] = {}
+        self.clients: dict[str, socket.socket] = {}
         self.server = None
         self.server_udp = None
         self.update_all_clients_data = None
@@ -42,9 +47,9 @@ class Server:
         self.keyboard_listener = None
         self.mouse_listener = None
 
-        self.gui = MainWindow()
+        self.gui = MainWindow(self.send_to_all_clients)
 
-    def main(self):
+    def init(self):
         if self.config.auto_enable_startup:
             StartupUtils.add_to_startup("Server")
 
@@ -118,7 +123,7 @@ class Server:
                     Logger.log("Маячковый сервер запущен")
                     while self.running:
                         self.server_udp.sendto(serialize_packet(IAmServerPacket()),
-                                            ("255.255.255.255", self.config.beacon_port))
+                                               ("255.255.255.255", self.config.beacon_port))
                         await asyncio.sleep(self.config.beacon_interval)
             except Exception:
                 traceback.print_exc()
@@ -199,55 +204,57 @@ class Server:
                 Logger.log(f"{len(self.clients)}) Отключен {client_socket.getpeername()}")
 
     def start_listen_actions(self):
-        self.keyboard_listener = self.run_keyboard_listener()
-        self.mouse_listener = self.run_mouse_listener()
+        return
+        # self.keyboard_listener = self.run_keyboard_listener()
+        # self.mouse_listener = self.run_mouse_listener()
 
     def stop_listen_actions(self):
+        return
         self.keyboard_listener.stop()
         self.mouse_listener.stop()
 
-    def run_keyboard_listener(self):
-        from pynput import keyboard
-        def on_press(key):
-            if isinstance(key, keyboard.Key):
-                key = key.value
-            self.send_to_all_clients(KeyboardPressPacket(key.vk))
+    # def run_keyboard_listener(self):
+    #     from pynput import keyboard
+    #     def on_press(key):
+    #         if isinstance(key, keyboard.Key):
+    #             key = key.value
+    #         self.send_to_all_clients(KeyboardPressPacket(key.vk))
+    #
+    #     def on_release(key):
+    #         if isinstance(key, keyboard.Key):
+    #             key = key.value
+    #         self.send_to_all_clients(KeyboardReleasePacket(key.vk))
+    #
+    #     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    #     listener.start()
+    #     return listener
 
-        def on_release(key):
-            if isinstance(key, keyboard.Key):
-                key = key.value
-            self.send_to_all_clients(KeyboardReleasePacket(key.vk))
-
-        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-        listener.start()
-        return listener
-
-    def run_mouse_listener(self):
-        from pynput import mouse
-        monitor = screeninfo.get_monitors()[0]
-        screen_width, screen_height = monitor.width, monitor.height
-
-        def on_move(x, y):
-            self.send_to_all_clients(
-                MouseMovementAbsolutePercentagePacket(x / screen_width, y / screen_height))
-
-        def on_click(x, y, magic_button, pressed):
-            magic_to_button_index = {(4, 2, 0): 1, (64, 32, 0): 2, (16, 8, 0): 3}
-            button = magic_to_button_index.get(magic_button.value)
-            if button is None:
-                Logger.log("unknown mouse button pressed/released: {}".format(magic_button))
-                return
-            if pressed:
-                self.send_to_all_clients(MousePressPacket(button))
-            else:
-                self.send_to_all_clients(MouseReleasePacket(button))
-
-        def on_scroll(x, y, dx, dy):
-            self.send_to_all_clients(MouseScrollPacket(dx, dy))
-
-        listener = mouse.Listener(on_move=on_move, on_click=on_click, on_scroll=on_scroll)
-        listener.start()
-        return listener
+    # def run_mouse_listener(self):
+    #     from pynput import mouse
+    #     monitor = screeninfo.get_monitors()[0]
+    #     screen_width, screen_height = monitor.width, monitor.height
+    #
+    #     def on_move(x, y):
+    #         self.send_to_all_clients(
+    #             MouseMovementAbsolutePercentagePacket(x / screen_width, y / screen_height))
+    #
+    #     def on_click(x, y, magic_button, pressed):
+    #         magic_to_button_index = {(4, 2, 0): 1, (64, 32, 0): 2, (16, 8, 0): 3}
+    #         button = magic_to_button_index.get(magic_button.value)
+    #         if button is None:
+    #             Logger.log("unknown mouse button pressed/released: {}".format(magic_button))
+    #             return
+    #         if pressed:
+    #             self.send_to_all_clients(MousePressPacket(button))
+    #         else:
+    #             self.send_to_all_clients(MouseReleasePacket(button))
+    #
+    #     def on_scroll(x, y, dx, dy):
+    #         self.send_to_all_clients(MouseScrollPacket(dx, dy))
+    #
+    #     listener = mouse.Listener(on_move=on_move, on_click=on_click, on_scroll=on_scroll)
+    #     listener.start()
+    #     return listener
 
     def update_all_clients(self, path_to_file):
         with open(path_to_file, 'rb') as file:
@@ -270,22 +277,23 @@ class ClientObject:
         self.name = name
         self.socket = socket
 
+
 if __name__ == "__main__":
     CoreConstants.init()
     Logger.log(CoreConstants.greeting("Server"))
-    is_main_loop_running = True
-    while is_main_loop_running:
-        try:
-            server = Server()
-            server.main()
-            server.join()
-        except KeyboardInterrupt:
-            server.stop()  # noqa
-            server.join()
-            break
-        except:
-            Logger.error("КРИТИЧЕСКАЯ ОШИБКА, пожалуйста, напишите автору")
-            Logger.error(traceback.format_exc())
-            Logger.log("Рестарт через 5 секунд...")
-            time.sleep(5)
-    Logger.log("Выполнение программы завершено")
+    app = QApplication(sys.argv)
+
+    try:
+        server = Server()
+        server.init()
+    except KeyboardInterrupt:
+        server.stop()  # noqa
+        exit()
+    except:
+        Logger.error("КРИТИЧЕСКАЯ ОШИБКА, пожалуйста, напишите автору")
+        Logger.error(traceback.format_exc())
+        Logger.log("Рестарт через 5 секунд...")
+        time.sleep(5)
+
+    server.gui.show()
+    sys.exit(app.exec_())

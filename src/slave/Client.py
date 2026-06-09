@@ -68,7 +68,7 @@ class Client:
 
         self.keyboard_listeners = self.run_keyboard_listeners()
 
-        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+        JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), self.config.screen_quality]
         sct = mss.MSS()
         monitor = sct.monitors[1]
         def send_screen():
