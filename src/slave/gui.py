@@ -1,22 +1,24 @@
-import sys
 import traceback
 
 import cv2
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, \
-    QWidget
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtWidgets import QMainWindow, QLabel, QVBoxLayout, \
+    QWidget
 
-from src.core.protocol.Keyboard import KeyboardPressPacket, KeyboardReleasePacket
-from src.core.protocol.Mouse import MouseMovementAbsolutePercentagePacket, MousePressPacket, MouseReleasePacket, \
+from src.core.protocol.Keyboard import KeyboardPressPacket, \
+    KeyboardReleasePacket
+from src.core.protocol.Mouse import MouseMovementAbsolutePercentagePacket, \
+    MousePressPacket, MouseReleasePacket, \
     MouseScrollPacket
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, send_to_all_clients_func):
+    def __init__(self, send_to_all_clients_func, stop_running):
         super().__init__()
         self.send_to_all_clients = send_to_all_clients_func
+        self.stop_running = stop_running
         self.init_ui()
         self.setMouseTracking(True)
         self.centralWidget().setMouseTracking(True)
@@ -94,3 +96,6 @@ class MainWindow(QMainWindow):
 
     def wheelEvent(self, event):
         self.send_to_all_clients(MouseScrollPacket(event.angleDelta().x(), event.angleDelta().y()))
+
+    def closeEvent(self, event):
+        self.stop_running()

@@ -11,7 +11,6 @@ import traceback
 
 import cv2
 import numpy as np
-import screeninfo
 from PyQt5.QtWidgets import QApplication
 
 import src.core.utils.CommandsListener
@@ -47,7 +46,9 @@ class Server:
         self.keyboard_listener = None
         self.mouse_listener = None
 
-        self.gui = MainWindow(self.send_to_all_clients)
+        def stop_running():
+            self.running = False
+        self.gui = MainWindow(self.send_to_all_clients, stop_running)
 
     def init(self):
         if self.config.auto_enable_startup:
