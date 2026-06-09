@@ -180,6 +180,7 @@ class Client:
                     self.handle_command(packet_name, buffer)
                 else:
                     break
+            self.scheduler.tick()
 
     def start_send_screen(self):
         JPEG_QUALITY = [int(cv2.IMWRITE_JPEG_QUALITY), 80]

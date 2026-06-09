@@ -1,4 +1,6 @@
 import time
+import traceback
+
 
 class Scheduler:
     def __init__(self):
@@ -6,7 +8,7 @@ class Scheduler:
 
     def schedule(self, func, delay1, delay_next=-1):
         # delays in ms
-        self.tasks.append((func, time.time() + delay1, delay_next))
+        self.tasks.append([func, time.time() + delay1, delay_next])
 
     def tick(self):
         current_time = time.time()
@@ -19,8 +21,8 @@ class Scheduler:
                     if task[2] > 0:
                         task[1] = time.time()+task[2]
                         remaining_tasks.append(task)
-                except Exception as e:
-                    print(e)
+                except Exception:
+                    traceback.print_exc()
             else:
                 remaining_tasks.append(task)
 

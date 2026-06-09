@@ -22,6 +22,7 @@ from src.core.protocol.Mouse import *
 from src.core.protocol.Screen import ScreenPacket
 from src.core.utils.PacketUtils import PacketBuilder
 from src.master.commands import *
+from src.slave.gui import MainWindow
 
 
 class Server:
@@ -41,7 +42,7 @@ class Server:
         self.keyboard_listener = None
         self.mouse_listener = None
 
-        self.gui =
+        self.gui = MainWindow()
 
     def main(self):
         if self.config.auto_enable_startup:
@@ -119,8 +120,8 @@ class Server:
                         self.server_udp.sendto(serialize_packet(IAmServerPacket()),
                                             ("255.255.255.255", self.config.beacon_port))
                         await asyncio.sleep(self.config.beacon_interval)
-            except Exception as e:
-                print(e)
+            except Exception:
+                traceback.print_exc()
             finally:
                 Logger.log("Маячковый сервер остановлен")
 
